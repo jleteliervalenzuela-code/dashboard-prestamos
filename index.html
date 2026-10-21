@@ -808,7 +808,8 @@
         prepararFiltros();
         el('contenido').hidden = false;
         renderizar();
-        el('pie').textContent = textoCargado() + ' Fuente: hoja «Datos_Publicos».';
+        el('pie').textContent = textoCargado() + ' Registros leídos del CSV: ' + formatoNumero(TODOS.length) +
+                                '. Fuente: hoja «Datos_Publicos».';
       })
       .catch(function (error) {
         if (error instanceof ErrorCSV) {
