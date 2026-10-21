@@ -1,0 +1,1105 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Dashboard de préstamos</title>
+
+  <style>
+    /* ---------- Colores y tipografía ----------
+       Los dos colores institucionales se definen en CONFIG (más abajo, en el
+       JavaScript) y se aplican aquí al abrir la página. */
+    :root {
+      --principal: #1F3864;
+      --acento: #F2A900;
+      --fondo: #F3F5F9;
+      --superficie: #FFFFFF;
+      --texto: #1B2433;
+      --texto-suave: #5A6579;
+      --linea: #DDE2EC;
+      --error-fondo: #FCE8E6;
+      --error-texto: #8C1D18;
+      --fuente: "Helvetica Neue", Helvetica, Arial, sans-serif;
+    }
+
+    * { box-sizing: border-box; }
+
+    body {
+      margin: 0;
+      font-family: var(--fuente);
+      font-size: 16px;
+      line-height: 1.45;
+      color: var(--texto);
+      background: var(--fondo);
+    }
+
+    .contenedor { max-width: 1180px; margin: 0 auto; padding: 0 16px; }
+
+    /* ---------- Cabecera ---------- */
+    .cabecera {
+      background: var(--principal);
+      border-bottom: 4px solid var(--acento);
+      color: #fff;
+    }
+    .cabecera-fila {
+      display: flex; flex-wrap: wrap; align-items: center;
+      justify-content: space-between; gap: 12px;
+      padding-top: 18px; padding-bottom: 18px;
+    }
+    h1 {
+      margin: 0;
+      font-size: clamp(1.15rem, 2.6vw, 1.65rem);
+      font-weight: 700; letter-spacing: -0.01em;
+    }
+    .boton-actualizar {
+      font: inherit; font-weight: 700; font-size: 0.95rem;
+      color: var(--principal); background: var(--acento);
+      border: 0; border-radius: 6px; padding: 9px 18px; cursor: pointer;
+    }
+    .boton-actualizar:hover { filter: brightness(0.95); }
+    .boton-actualizar:disabled { opacity: 0.65; cursor: default; }
+
+    :focus-visible { outline: 3px solid var(--acento); outline-offset: 2px; }
+    .cabecera :focus-visible { outline-color: #fff; }
+
+    main { padding-top: 20px; padding-bottom: 28px; }
+
+    /* ---------- Mensajes ---------- */
+    .mensaje-error {
+      background: var(--error-fondo); color: var(--error-texto);
+      border-left: 5px solid var(--error-texto); border-radius: 6px;
+      padding: 14px 16px; margin-bottom: 18px;
+    }
+    .mensaje-error strong { display: block; margin-bottom: 2px; }
+    .mensaje-cargando { color: var(--texto-suave); padding: 24px 0; }
+    [hidden] { display: none !important; }
+
+    /* ---------- Filtros ---------- */
+    .filtros {
+      display: flex; flex-wrap: wrap; align-items: flex-end; gap: 14px 18px;
+      margin-bottom: 16px;
+    }
+    .campo { display: flex; flex-direction: column; gap: 4px; min-width: 200px; flex: 1 1 200px; max-width: 320px; }
+    .campo label { font-size: 0.85rem; color: var(--texto-suave); font-weight: 600; }
+    select {
+      font: inherit; font-size: 0.95rem; color: var(--texto);
+      background: var(--superficie); border: 1px solid #C3CBDA; border-radius: 6px;
+      padding: 8px 10px; width: 100%;
+    }
+    .boton-texto {
+      font: inherit; font-size: 0.9rem; color: var(--principal); background: none;
+      border: 0; text-decoration: underline; cursor: pointer; padding: 8px 4px;
+    }
+    .cuenta-filtro { font-size: 0.9rem; color: var(--texto-suave); padding: 8px 0; margin-left: auto; }
+
+    /* ---------- Tarjetas de resumen ---------- */
+    .resumen {
+      display: grid; grid-template-columns: repeat(4, 1fr);
+      background: var(--superficie); border: 1px solid var(--linea);
+      border-top: 4px solid var(--acento); border-radius: 10px;
+      margin-bottom: 18px;
+    }
+    .dato { padding: 16px 18px; border-left: 1px solid var(--linea); min-width: 0; }
+    .dato:first-child { border-left: 0; }
+    .dato-etiqueta { font-size: 0.85rem; color: var(--texto-suave); font-weight: 600; }
+    .dato-valor {
+      font-size: clamp(1.35rem, 2.6vw, 2rem); font-weight: 700; color: var(--principal);
+      line-height: 1.2; margin: 4px 0 2px; overflow-wrap: anywhere;
+    }
+    .dato-detalle { font-size: 0.85rem; color: var(--texto-suave); }
+
+    /* ---------- Paneles con gráficos y tabla ---------- */
+    .paneles { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 18px; align-items: start; }
+    .panel {
+      background: var(--superficie); border: 1px solid var(--linea);
+      border-radius: 10px; padding: 16px; min-width: 0;
+    }
+    .panel-cabecera {
+      display: flex; flex-wrap: wrap; align-items: center;
+      justify-content: space-between; gap: 8px; margin-bottom: 12px;
+    }
+    h2 { margin: 0; font-size: 1.05rem; color: var(--principal); }
+    .descargas { display: flex; align-items: center; gap: 6px; }
+    .descargas-etiqueta { font-size: 0.8rem; color: var(--texto-suave); margin-right: 2px; }
+    .boton-descarga {
+      font: inherit; font-size: 0.82rem; font-weight: 600; color: var(--principal);
+      background: var(--superficie); border: 1px solid var(--principal); border-radius: 5px;
+      padding: 4px 10px; cursor: pointer;
+    }
+    .boton-descarga:hover { background: var(--principal); color: #fff; }
+    .boton-descarga:disabled { opacity: 0.5; cursor: default; background: var(--superficie); color: var(--principal); }
+
+    .grafico { position: relative; width: 100%; }
+    .nota-panel { font-size: 0.82rem; color: var(--texto-suave); margin: 8px 0 0; }
+
+    .tabla-scroll { overflow-x: auto; }
+    table { width: 100%; border-collapse: collapse; font-size: 0.92rem; }
+    th {
+      text-align: left; color: var(--principal); font-weight: 700;
+      border-bottom: 2px solid var(--acento); padding: 6px 8px;
+    }
+    td { padding: 7px 8px; border-bottom: 1px solid var(--linea); vertical-align: top; }
+    .num { text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; }
+    td.rango { color: var(--texto-suave); width: 1%; }
+
+    #avisoDescarga { min-height: 1.4em; margin: 14px 0 0; font-size: 0.9rem; color: var(--texto-suave); }
+    #avisoDescarga.con-error { color: var(--error-texto); font-weight: 600; }
+
+    /* ---------- Pie de página ---------- */
+    footer { border-top: 1px solid var(--linea); background: var(--superficie); }
+    footer p { margin: 0; padding: 14px 0; font-size: 0.85rem; color: var(--texto-suave); }
+
+    /* ---------- Celular y tablet ---------- */
+    @media (max-width: 900px) {
+      .resumen { grid-template-columns: repeat(2, 1fr); }
+      .dato:nth-child(3) { border-left: 0; }
+      .dato:nth-child(n+3) { border-top: 1px solid var(--linea); }
+      .paneles { grid-template-columns: minmax(0, 1fr); }
+      .cuenta-filtro { margin-left: 0; width: 100%; }
+    }
+    @media (max-width: 520px) {
+      .resumen { grid-template-columns: 1fr; }
+      .dato { border-left: 0; border-top: 1px solid var(--linea); }
+      .dato:first-child { border-top: 0; }
+      .campo { max-width: none; }
+      .boton-actualizar { width: 100%; }
+    }
+  </style>
+</head>
+
+<body>
+  <header class="cabecera">
+    <div class="contenedor cabecera-fila">
+      <h1 id="titulo">Dashboard de préstamos</h1>
+      <button type="button" class="boton-actualizar" id="btnActualizar">Actualizar datos</button>
+    </div>
+  </header>
+
+  <main class="contenedor">
+    <noscript>Este dashboard necesita JavaScript activado para mostrar los datos.</noscript>
+
+    <!-- Aquí aparece el mensaje si el CSV no se puede leer -->
+    <div class="mensaje-error" id="mensajeError" role="alert" hidden></div>
+
+    <div class="mensaje-cargando" id="mensajeCargando" role="status">Cargando datos…</div>
+
+    <div id="contenido" hidden>
+      <!-- Filtros -->
+      <section class="filtros" aria-label="Filtros">
+        <div class="campo">
+          <label for="filtroSede">Sede</label>
+          <select id="filtroSede"></select>
+        </div>
+        <div class="campo">
+          <label for="filtroCarrera">Carrera</label>
+          <select id="filtroCarrera"></select>
+        </div>
+        <button type="button" class="boton-texto" id="btnLimpiar">Quitar filtros</button>
+        <span class="cuenta-filtro" id="cuentaFiltro" role="status"></span>
+      </section>
+
+      <!-- Cuando los filtros no dejan ningún préstamo -->
+      <div class="mensaje-cargando" id="sinResultados" hidden>
+        No hay préstamos con esta combinación de filtros. Prueba con otra sede o carrera.
+      </div>
+
+      <div id="vistaDatos">
+        <!-- 4 tarjetas de resumen -->
+        <section class="resumen" aria-label="Resumen">
+          <div class="dato">
+            <div class="dato-etiqueta">Total de préstamos</div>
+            <div class="dato-valor" id="kpiTotal">–</div>
+            <div class="dato-detalle" id="kpiTotalDetalle"></div>
+          </div>
+          <div class="dato">
+            <div class="dato-etiqueta">Usuarios únicos</div>
+            <div class="dato-valor" id="kpiUsuarios">–</div>
+            <div class="dato-detalle">personas con al menos un préstamo</div>
+          </div>
+          <div class="dato">
+            <div class="dato-etiqueta">Sede con más préstamos</div>
+            <div class="dato-valor" id="kpiSede">–</div>
+            <div class="dato-detalle" id="kpiSedeDetalle"></div>
+          </div>
+          <div class="dato">
+            <div class="dato-etiqueta">Carrera con más préstamos</div>
+            <div class="dato-valor" id="kpiCarrera">–</div>
+            <div class="dato-detalle" id="kpiCarreraDetalle"></div>
+          </div>
+        </section>
+
+        <!-- Gráficos y tabla -->
+        <section class="paneles">
+          <article class="panel">
+            <div class="panel-cabecera">
+              <h2>Préstamos por sede</h2>
+              <div class="descargas">
+                <span class="descargas-etiqueta">Descargar</span>
+                <button type="button" class="boton-descarga" data-cat="sede" data-fmt="pdf" aria-label="Descargar préstamos por sede en PDF">PDF</button>
+                <button type="button" class="boton-descarga" data-cat="sede" data-fmt="xlsx" aria-label="Descargar préstamos por sede en Excel">Excel</button>
+              </div>
+            </div>
+            <div class="grafico" id="cajaSede"><canvas id="grSede" role="img" aria-label="Gráfico de préstamos por sede"></canvas></div>
+          </article>
+
+          <article class="panel">
+            <div class="panel-cabecera">
+              <h2>Préstamos por mes</h2>
+              <div class="descargas">
+                <span class="descargas-etiqueta">Descargar</span>
+                <button type="button" class="boton-descarga" data-cat="mes" data-fmt="pdf" aria-label="Descargar préstamos por mes en PDF">PDF</button>
+                <button type="button" class="boton-descarga" data-cat="mes" data-fmt="xlsx" aria-label="Descargar préstamos por mes en Excel">Excel</button>
+              </div>
+            </div>
+            <div class="grafico" id="cajaMes" style="height:300px"><canvas id="grMes" role="img" aria-label="Gráfico de préstamos por mes"></canvas></div>
+            <p class="nota-panel" id="notaMes" hidden></p>
+          </article>
+
+          <article class="panel">
+            <div class="panel-cabecera">
+              <h2>Préstamos por carrera</h2>
+              <div class="descargas">
+                <span class="descargas-etiqueta">Descargar</span>
+                <button type="button" class="boton-descarga" data-cat="carrera" data-fmt="pdf" aria-label="Descargar préstamos por carrera en PDF">PDF</button>
+                <button type="button" class="boton-descarga" data-cat="carrera" data-fmt="xlsx" aria-label="Descargar préstamos por carrera en Excel">Excel</button>
+              </div>
+            </div>
+            <div class="grafico" id="cajaCarrera"><canvas id="grCarrera" role="img" aria-label="Gráfico de préstamos por carrera"></canvas></div>
+          </article>
+
+          <article class="panel">
+            <div class="panel-cabecera">
+              <h2>10 títulos más prestados</h2>
+              <div class="descargas">
+                <span class="descargas-etiqueta">Descargar</span>
+                <button type="button" class="boton-descarga" data-cat="titulos" data-fmt="pdf" aria-label="Descargar los 10 títulos más prestados en PDF">PDF</button>
+                <button type="button" class="boton-descarga" data-cat="titulos" data-fmt="xlsx" aria-label="Descargar los 10 títulos más prestados en Excel">Excel</button>
+              </div>
+            </div>
+            <div class="tabla-scroll">
+              <table>
+                <thead>
+                  <tr><th scope="col">#</th><th scope="col">Título</th><th scope="col">Autor</th><th scope="col" class="num">Préstamos</th></tr>
+                </thead>
+                <tbody id="cuerpoTitulos"></tbody>
+              </table>
+            </div>
+          </article>
+        </section>
+
+        <p id="avisoDescarga" role="status"></p>
+      </div>
+    </div>
+  </main>
+
+  <footer>
+    <div class="contenedor">
+      <p id="pie">Aún no se han cargado datos.</p>
+    </div>
+  </footer>
+
+  <!-- Librerías externas, todas con número de versión fijo -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/papaparse@5.4.1/papaparse.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/jspdf-autotable@3.8.2/dist/jspdf.plugin.autotable.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/exceljs@4.4.0/dist/exceljs.min.js"></script>
+
+  <script>
+  /* =====================================================================
+     AJUSTES: lo único que normalmente tendrás que cambiar
+     ===================================================================== */
+  /* ===== LÓGICA:INICIO ===== */
+  var CONFIG = {
+    // Nombre que aparece en el título del dashboard
+    NOMBRE_BIBLIOTECA: 'Bibliotecas Duoc UC',
+
+    // Dirección de la hoja «Datos_Publicos» publicada como CSV
+    URL_CSV: 'https://docs.google.com/spreadsheets/d/e/2PACX-1vRSuOshBToxdcKNtOKqCnYdJ0dGboImhnS2EyzgOUxtbUO9iArvppBvkPXI2IEqmvWl04y-aBp-ttsj/pub?gid=1598572415&single=true&output=csv',
+
+    // Colores institucionales
+    COLOR_PRINCIPAL: '#1F3864',
+    COLOR_ACENTO: '#F2A900'
+  };
+
+  // Columnas que debe traer el CSV (las crea la herramienta de carga)
+  var COLUMNAS_CSV = ['id_usuario', 'titulo', 'autor', 'fecha_devolucion', 'sede', 'carrera'];
+  var MESES = ['ene', 'feb', 'mar', 'abr', 'may', 'jun', 'jul', 'ago', 'sep', 'oct', 'nov', 'dic'];
+  var FUENTE = '"Helvetica Neue", Helvetica, Arial, sans-serif';
+
+  /* =====================================================================
+     1. LEER EL CSV
+     ===================================================================== */
+
+  // Error con mensaje pensado para mostrarse tal cual en pantalla
+  function ErrorCSV(mensaje) {
+    this.message = mensaje;
+    this.name = 'ErrorCSV';
+  }
+  ErrorCSV.prototype = Object.create(Error.prototype);
+
+  function limpiarTexto(valor) {
+    return String(valor == null ? '' : valor).trim();
+  }
+
+  // Convierte el texto del CSV en una lista de préstamos
+  function leerCSV(texto) {
+    var t = String(texto).replace(/^\uFEFF/, '').replace(/^\s+/, '');
+
+    // Si Google devuelve una página web en vez de un CSV, la dirección no sirve
+    if (t.charAt(0) === '<') {
+      throw new ErrorCSV('La dirección no entregó un CSV, sino una página web. Revisa que la hoja siga publicada en la web en formato CSV.');
+    }
+
+    var resultado = Papa.parse(t, {
+      header: true,
+      skipEmptyLines: 'greedy',
+      transformHeader: function (h) { return h.trim().toLowerCase(); }
+    });
+
+    var campos = (resultado.meta && resultado.meta.fields) || [];
+    var faltan = COLUMNAS_CSV.filter(function (c) { return campos.indexOf(c) === -1; });
+    if (faltan.length > 0) {
+      throw new ErrorCSV('Al CSV le faltan estas columnas: ' + faltan.join(', ') + '. Vuelve a cargar la planilla con la herramienta de carga.');
+    }
+
+    var filas = resultado.data.map(function (f) {
+      return {
+        id: limpiarTexto(f.id_usuario),
+        titulo: limpiarTexto(f.titulo) || '(sin título)',
+        autor: limpiarTexto(f.autor),
+        fecha: limpiarTexto(f.fecha_devolucion),
+        sede: limpiarTexto(f.sede) || '(sin sede)',
+        carrera: limpiarTexto(f.carrera) || '(sin carrera)'
+      };
+    }).filter(function (f) { return f.id !== '' || f.autor !== '' || f.titulo !== '(sin título)'; });
+
+    if (filas.length === 0) {
+      throw new ErrorCSV('El CSV no tiene registros. Carga una planilla con la herramienta de carga y vuelve a intentarlo.');
+    }
+    return filas;
+  }
+
+  /* =====================================================================
+     2. CONTAR Y AGRUPAR (todo se calcula a partir del CSV)
+     ===================================================================== */
+
+  // Ordena de mayor a menor; si hay empate, por nombre
+  function ordenarPorPrestamos(a, b) {
+    return (b.prestamos - a.prestamos) || a.nombre.localeCompare(b.nombre, 'es');
+  }
+
+  // Cuenta préstamos agrupando por un campo (sede o carrera)
+  function contarPor(filas, campo) {
+    var mapa = new Map();
+    filas.forEach(function (f) { mapa.set(f[campo], (mapa.get(f[campo]) || 0) + 1); });
+    return Array.from(mapa, function (par) { return { nombre: par[0], prestamos: par[1] }; })
+      .sort(ordenarPorPrestamos);
+  }
+
+  // Cuenta préstamos por mes, en orden de calendario y sin saltarse meses
+  function contarPorMes(filas) {
+    var mapa = new Map();
+    var sinFecha = 0;
+    filas.forEach(function (f) {
+      var m = /^(\d{4})-(\d{2})-\d{2}/.exec(f.fecha);
+      if (!m || +m[2] < 1 || +m[2] > 12) { sinFecha++; return; }
+      var clave = m[1] + '-' + m[2];
+      mapa.set(clave, (mapa.get(clave) || 0) + 1);
+    });
+    if (mapa.size === 0) return { meses: [], sinFecha: sinFecha };
+
+    var claves = Array.from(mapa.keys()).sort();
+    var ini = claves[0].split('-').map(Number);
+    var fin = claves[claves.length - 1].split('-').map(Number);
+    var totalMeses = (fin[0] - ini[0]) * 12 + (fin[1] - ini[1]) + 1;
+
+    var meses = [];
+    if (totalMeses > 120) {
+      // Rango demasiado largo (probable fecha errónea): solo se muestran los meses con datos
+      claves.forEach(function (k) {
+        var p = k.split('-').map(Number);
+        meses.push({ clave: k, nombre: MESES[p[1] - 1] + ' ' + p[0], prestamos: mapa.get(k) });
+      });
+    } else {
+      var a = ini[0], mes = ini[1];
+      for (var i = 0; i < totalMeses; i++) {
+        var k2 = a + '-' + (mes < 10 ? '0' + mes : mes);
+        meses.push({ clave: k2, nombre: MESES[mes - 1] + ' ' + a, prestamos: mapa.get(k2) || 0 });
+        mes++;
+        if (mes > 12) { mes = 1; a++; }
+      }
+    }
+    return { meses: meses, sinFecha: sinFecha };
+  }
+
+  // Los títulos más prestados
+  function topTitulos(filas, cantidad) {
+    var mapa = new Map();
+    filas.forEach(function (f) {
+      var e = mapa.get(f.titulo);
+      if (e) { e.prestamos++; }
+      else { mapa.set(f.titulo, { nombre: f.titulo, autor: f.autor, prestamos: 1 }); }
+    });
+    return Array.from(mapa.values()).sort(ordenarPorPrestamos).slice(0, cantidad);
+  }
+
+  // Rango de fechas válidas (para el detalle de la tarjeta de total)
+  function rangoFechas(filas) {
+    var validas = filas.map(function (f) { return f.fecha; })
+      .filter(function (x) { return /^\d{4}-\d{2}-\d{2}/.test(x); })
+      .map(function (x) { return x.slice(0, 10); })
+      .sort();
+    if (validas.length === 0) return null;
+    return { desde: validas[0], hasta: validas[validas.length - 1] };
+  }
+
+  // Convierte 2026-03-16 en 16-03-2026
+  function fechaLegible(iso) {
+    var p = iso.split('-');
+    return p[2] + '-' + p[1] + '-' + p[0];
+  }
+
+  function formatoNumero(n) { return Number(n).toLocaleString('es-CL'); }
+
+  function formatoPorcentaje(fraccion) {
+    return (fraccion * 100).toLocaleString('es-CL', { minimumFractionDigits: 1, maximumFractionDigits: 1 }) + ' %';
+  }
+
+  // Las 4 cifras de las tarjetas
+  function calcularResumen(filas) {
+    var ids = {};
+    filas.forEach(function (f) { if (f.id) ids[f.id] = true; });
+    var sedes = contarPor(filas, 'sede');
+    var carreras = contarPor(filas, 'carrera');
+    return {
+      total: filas.length,
+      usuarios: Object.keys(ids).length,
+      sedeTop: sedes[0] || null,
+      carreraTop: carreras[0] || null
+    };
+  }
+
+  /* =====================================================================
+     3. TABLAS PARA DESCARGAR (una por categoría)
+     ===================================================================== */
+
+  function armarModelos(filas) {
+    var total = filas.length;
+    var porcentaje = function (n) { return total ? n / total : 0; };
+
+    var sedes = contarPor(filas, 'sede');
+    var carreras = contarPor(filas, 'carrera');
+    var mes = contarPorMes(filas);
+    var titulos = topTitulos(filas, 10);
+    var totalMeses = mes.meses.reduce(function (s, m) { return s + m.prestamos; }, 0);
+
+    return {
+      sede: {
+        clave: 'sede', archivo: 'prestamos-por-sede', titulo: 'Préstamos por sede', grafico: 'grSede',
+        columnas: [
+          { titulo: 'Sede', tipo: 'texto', ancho: 32 },
+          { titulo: 'Préstamos', tipo: 'entero', ancho: 14 },
+          { titulo: '% del total', tipo: 'porcentaje', ancho: 14 }
+        ],
+        filas: sedes.map(function (s) { return [s.nombre, s.prestamos, porcentaje(s.prestamos)]; }),
+        pie: ['Total', total, total ? 1 : 0]
+      },
+      mes: {
+        clave: 'mes', archivo: 'prestamos-por-mes', titulo: 'Préstamos por mes', grafico: 'grMes',
+        columnas: [
+          { titulo: 'Mes', tipo: 'texto', ancho: 20 },
+          { titulo: 'Préstamos', tipo: 'entero', ancho: 14 }
+        ],
+        filas: mes.meses.map(function (m) { return [m.nombre, m.prestamos]; }),
+        pie: ['Total', totalMeses]
+      },
+      carrera: {
+        clave: 'carrera', archivo: 'prestamos-por-carrera', titulo: 'Préstamos por carrera', grafico: 'grCarrera',
+        columnas: [
+          { titulo: 'Carrera', tipo: 'texto', ancho: 40 },
+          { titulo: 'Préstamos', tipo: 'entero', ancho: 14 },
+          { titulo: '% del total', tipo: 'porcentaje', ancho: 14 }
+        ],
+        filas: carreras.map(function (c) { return [c.nombre, c.prestamos, porcentaje(c.prestamos)]; }),
+        pie: ['Total', total, total ? 1 : 0]
+      },
+      titulos: {
+        clave: 'titulos', archivo: 'diez-titulos-mas-prestados', titulo: '10 títulos más prestados', grafico: null,
+        columnas: [
+          { titulo: '#', tipo: 'rango', ancho: 6 },
+          { titulo: 'Título', tipo: 'texto', ancho: 46 },
+          { titulo: 'Autor', tipo: 'texto', ancho: 28 },
+          { titulo: 'Préstamos', tipo: 'entero', ancho: 14 }
+        ],
+        filas: titulos.map(function (t, i) { return [i + 1, t.nombre, t.autor, t.prestamos]; }),
+        pie: null
+      }
+    };
+  }
+
+  // Texto de una celda para el PDF
+  function textoCelda(valor, tipo) {
+    if (tipo === 'entero') return formatoNumero(valor);
+    if (tipo === 'porcentaje') return formatoPorcentaje(valor);
+    return String(valor);
+  }
+
+  function hexARgb(hex) {
+    var h = hex.replace('#', '');
+    return [parseInt(h.slice(0, 2), 16), parseInt(h.slice(2, 4), 16), parseInt(h.slice(4, 6), 16)];
+  }
+  function hexAArgb(hex) { return 'FF' + hex.replace('#', '').toUpperCase(); }
+
+  /* =====================================================================
+     4. CREAR EL PDF (colores y tipografía del dashboard)
+     contexto = { titulo, filtros, cargado, imagen: {url, ancho, alto} | null }
+     ===================================================================== */
+  function construirPDF(modelo, contexto) {
+    var jsPDF = globalThis.jspdf.jsPDF;
+    var doc = new jsPDF({ unit: 'mm', format: 'a4', orientation: 'portrait' });
+    var ancho = doc.internal.pageSize.getWidth();
+    var alto = doc.internal.pageSize.getHeight();
+    var P = hexARgb(CONFIG.COLOR_PRINCIPAL);
+    var A = hexARgb(CONFIG.COLOR_ACENTO);
+    var margen = 14;
+
+    // Franja superior con los colores institucionales
+    doc.setFillColor(P[0], P[1], P[2]);
+    doc.rect(0, 0, ancho, 22, 'F');
+    doc.setFillColor(A[0], A[1], A[2]);
+    doc.rect(0, 22, ancho, 1.6, 'F');
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(14);
+    doc.setTextColor(255, 255, 255);
+    doc.text(contexto.titulo, margen, 14);
+
+    // Nombre de la categoría y filtros usados
+    doc.setTextColor(P[0], P[1], P[2]);
+    doc.setFontSize(17);
+    doc.text(modelo.titulo, margen, 36);
+    doc.setFont('helvetica', 'normal');
+    doc.setFontSize(10);
+    doc.setTextColor(90, 101, 121);
+    var lineasFiltro = doc.splitTextToSize(contexto.filtros, ancho - margen * 2);
+    doc.text(lineasFiltro, margen, 43);
+    var y = 43 + lineasFiltro.length * 5 + 3;
+
+    // Gráfico (si la categoría lo tiene)
+    if (contexto.imagen) {
+      var anchoMax = ancho - margen * 2;
+      var altoMax = 100;
+      var w = anchoMax;
+      var h = w * contexto.imagen.alto / contexto.imagen.ancho;
+      if (h > altoMax) { h = altoMax; w = h * contexto.imagen.ancho / contexto.imagen.alto; }
+      doc.addImage(contexto.imagen.url, 'PNG', margen, y, w, h);
+      y += h + 6;
+    }
+
+    // Tabla
+    var columnStyles = {};
+    modelo.columnas.forEach(function (c, i) {
+      if (c.tipo === 'entero' || c.tipo === 'porcentaje') columnStyles[i] = { halign: 'right' };
+      if (c.tipo === 'rango') columnStyles[i] = { halign: 'center', cellWidth: 12 };
+    });
+    doc.autoTable({
+      startY: y,
+      head: [modelo.columnas.map(function (c) { return c.titulo; })],
+      body: modelo.filas.map(function (f) {
+        return f.map(function (v, i) { return textoCelda(v, modelo.columnas[i].tipo); });
+      }),
+      foot: modelo.pie ? [modelo.pie.map(function (v, i) { return textoCelda(v, modelo.columnas[i].tipo); })] : undefined,
+      showFoot: 'lastPage',
+      margin: { left: margen, right: margen, bottom: 18 },
+      styles: { font: 'helvetica', fontSize: 9, textColor: [27, 36, 51], lineColor: [221, 226, 236], lineWidth: 0.1, cellPadding: 2 },
+      headStyles: { fillColor: P, textColor: [255, 255, 255], fontStyle: 'bold' },
+      footStyles: { fillColor: [232, 236, 244], textColor: P, fontStyle: 'bold' },
+      alternateRowStyles: { fillColor: [245, 247, 251] },
+      columnStyles: columnStyles,
+      // Encabezado y total usan la misma alineación que los números de su columna
+      didParseCell: function (data) {
+        var estilo = columnStyles[data.column.index];
+        if (estilo && estilo.halign && (data.section === 'head' || data.section === 'foot')) {
+          data.cell.styles.halign = estilo.halign;
+        }
+      }
+    });
+
+    // Pie de cada página
+    var paginas = doc.getNumberOfPages();
+    for (var i = 1; i <= paginas; i++) {
+      doc.setPage(i);
+      doc.setDrawColor(A[0], A[1], A[2]);
+      doc.setLineWidth(0.6);
+      doc.line(margen, alto - 13, ancho - margen, alto - 13);
+      doc.setFont('helvetica', 'normal');
+      doc.setFontSize(8);
+      doc.setTextColor(90, 101, 121);
+      doc.text(contexto.cargado, margen, alto - 8);
+      doc.text('Página ' + i + ' de ' + paginas, ancho - margen, alto - 8, { align: 'right' });
+    }
+    return doc;
+  }
+
+  /* =====================================================================
+     5. CREAR EL EXCEL (colores y tipografía del dashboard)
+     ===================================================================== */
+  function construirExcel(modelo, contexto) {
+    var P = hexAArgb(CONFIG.COLOR_PRINCIPAL);
+    var A = hexAArgb(CONFIG.COLOR_ACENTO);
+    var relleno = function (argb) { return { type: 'pattern', pattern: 'solid', fgColor: { argb: argb } }; };
+    var fuente = function (extra) {
+      return Object.assign({ name: 'Arial', size: 10, color: { argb: 'FF1B2433' } }, extra || {});
+    };
+    var n = modelo.columnas.length;
+
+    var libro = new ExcelJS.Workbook();
+    libro.creator = contexto.titulo;
+    libro.created = new Date();
+    var hoja = libro.addWorksheet(modelo.titulo.slice(0, 31), {
+      views: [{ showGridLines: false, state: 'frozen', ySplit: 7 }]
+    });
+    modelo.columnas.forEach(function (c, i) { hoja.getColumn(i + 1).width = c.ancho; });
+
+    // Fila 1: franja con el título del dashboard
+    hoja.mergeCells(1, 1, 1, n);
+    var c1 = hoja.getCell(1, 1);
+    c1.value = contexto.titulo;
+    c1.font = fuente({ size: 14, bold: true, color: { argb: 'FFFFFFFF' } });
+    c1.fill = relleno(P);
+    c1.alignment = { vertical: 'middle', indent: 1 };
+    hoja.getRow(1).height = 30;
+
+    // Fila 2: línea de color de acento
+    for (var i = 1; i <= n; i++) { hoja.getCell(2, i).fill = relleno(A); }
+    hoja.getRow(2).height = 4;
+
+    // Filas 3 a 5: categoría, filtros y fecha de carga
+    hoja.mergeCells(3, 1, 3, n);
+    var c3 = hoja.getCell(3, 1);
+    c3.value = modelo.titulo;
+    c3.font = fuente({ size: 13, bold: true, color: { argb: P } });
+    hoja.getRow(3).height = 24;
+    hoja.mergeCells(4, 1, 4, n);
+    hoja.getCell(4, 1).value = contexto.filtros;
+    hoja.getCell(4, 1).font = fuente({ color: { argb: 'FF5A6579' } });
+    hoja.mergeCells(5, 1, 5, n);
+    hoja.getCell(5, 1).value = contexto.cargado;
+    hoja.getCell(5, 1).font = fuente({ color: { argb: 'FF5A6579' } });
+
+    // Fila 7: encabezados de la tabla
+    var filaEnc = 7;
+    modelo.columnas.forEach(function (c, i) {
+      var cel = hoja.getCell(filaEnc, i + 1);
+      cel.value = c.titulo;
+      cel.font = fuente({ bold: true, color: { argb: 'FFFFFFFF' } });
+      cel.fill = relleno(P);
+      cel.alignment = { vertical: 'middle', horizontal: c.tipo === 'texto' ? 'left' : (c.tipo === 'rango' ? 'center' : 'right') };
+      cel.border = { bottom: { style: 'medium', color: { argb: A } } };
+    });
+    hoja.getRow(filaEnc).height = 22;
+
+    // Datos
+    var formatoCelda = function (cel, tipo) {
+      if (tipo === 'entero') { cel.numFmt = '#,##0'; cel.alignment = { horizontal: 'right' }; }
+      else if (tipo === 'porcentaje') { cel.numFmt = '0.0%'; cel.alignment = { horizontal: 'right' }; }
+      else if (tipo === 'rango') { cel.alignment = { horizontal: 'center' }; }
+      else { cel.alignment = { horizontal: 'left', wrapText: true, vertical: 'top' }; }
+    };
+    modelo.filas.forEach(function (fila, r) {
+      fila.forEach(function (valor, i) {
+        var cel = hoja.getCell(filaEnc + 1 + r, i + 1);
+        cel.value = valor;                       // texto como texto: nunca se interpreta como fórmula
+        cel.font = fuente();
+        formatoCelda(cel, modelo.columnas[i].tipo);
+        cel.border = { bottom: { style: 'thin', color: { argb: 'FFDDE2EC' } } };
+        if (r % 2 === 1) cel.fill = relleno('FFF5F7FB');
+      });
+    });
+
+    // Fila de total
+    if (modelo.pie) {
+      var filaPie = filaEnc + 1 + modelo.filas.length;
+      modelo.pie.forEach(function (valor, i) {
+        var cel = hoja.getCell(filaPie, i + 1);
+        cel.value = valor;
+        cel.font = fuente({ bold: true, color: { argb: P } });
+        cel.fill = relleno('FFE8ECF4');
+        formatoCelda(cel, modelo.columnas[i].tipo);
+        cel.border = { top: { style: 'thin', color: { argb: P } } };
+      });
+    }
+    return libro.xlsx.writeBuffer();
+  }
+  /* ===== LÓGICA:FIN ===== */
+
+  /* =====================================================================
+     6. PANTALLA (todo lo que toca la página)
+     ===================================================================== */
+  var TODOS = [];             // todos los préstamos leídos del CSV
+  var MOMENTO_CARGA = null;   // cuándo se cargaron los datos
+  var GRAFICOS = {};          // gráficos de Chart.js activos
+  var MODELOS = {};           // tablas de la vista actual (para descargar)
+
+  function el(id) { return document.getElementById(id); }
+
+  // Aplica el nombre y los colores definidos en CONFIG
+  function aplicarAjustes() {
+    var titulo = 'Dashboard de préstamos – ' + CONFIG.NOMBRE_BIBLIOTECA;
+    el('titulo').textContent = titulo;
+    document.title = titulo;
+    document.documentElement.style.setProperty('--principal', CONFIG.COLOR_PRINCIPAL);
+    document.documentElement.style.setProperty('--acento', CONFIG.COLOR_ACENTO);
+  }
+
+  function dosDigitos(n) { return n < 10 ? '0' + n : String(n); }
+
+  // «21-10-2026 a las 14:32»
+  function textoMomento(fecha) {
+    return dosDigitos(fecha.getDate()) + '-' + dosDigitos(fecha.getMonth() + 1) + '-' + fecha.getFullYear() +
+           ' a las ' + dosDigitos(fecha.getHours()) + ':' + dosDigitos(fecha.getMinutes());
+  }
+
+  function textoCargado() {
+    return 'Datos cargados el ' + textoMomento(MOMENTO_CARGA) + ' (hora de este computador).';
+  }
+
+  function mostrarError(titulo, detalle) {
+    var caja = el('mensajeError');
+    caja.innerHTML = '';
+    var fuerte = document.createElement('strong');
+    fuerte.textContent = titulo;
+    caja.appendChild(fuerte);
+    caja.appendChild(document.createTextNode(detalle));
+    caja.hidden = false;
+  }
+
+  // ----- Carga de datos -----
+  function cargarDatos() {
+    var boton = el('btnActualizar');
+    boton.disabled = true;
+    boton.textContent = 'Actualizando…';
+    el('mensajeError').hidden = true;
+    if (TODOS.length === 0) el('mensajeCargando').hidden = false;
+
+    if (typeof Chart === 'undefined' || typeof Papa === 'undefined') {
+      el('mensajeCargando').hidden = true;
+      mostrarError('No se pudieron descargar las librerías del dashboard. ',
+        'Revisa tu conexión a internet y presiona «Actualizar datos».');
+      terminarCarga();
+      return;
+    }
+
+    // Se agrega la hora al final de la dirección para que el navegador
+    // no muestre una copia antigua guardada en caché
+    var url = new URL(CONFIG.URL_CSV);
+    url.searchParams.set('t', Date.now());
+
+    fetch(url.toString(), { cache: 'no-store' })
+      .then(function (resp) {
+        if (!resp.ok) {
+          throw new ErrorCSV('Google respondió con el código ' + resp.status + '. Revisa que la hoja siga publicada en la web como CSV y que la dirección sea la correcta.');
+        }
+        return resp.text();
+      })
+      .then(function (texto) {
+        TODOS = leerCSV(texto);
+        MOMENTO_CARGA = new Date();
+        prepararFiltros();
+        el('contenido').hidden = false;
+        renderizar();
+        el('pie').textContent = textoCargado() + ' Fuente: hoja «Datos_Publicos».';
+      })
+      .catch(function (error) {
+        if (error instanceof ErrorCSV) {
+          mostrarError('No se pudieron leer los datos. ', error.message);
+        } else {
+          mostrarError('No se pudo conectar con la hoja de datos. ',
+            'Revisa tu conexión a internet y que la hoja siga publicada en la web como CSV. Luego presiona «Actualizar datos».');
+        }
+        if (TODOS.length > 0) {
+          el('mensajeError').appendChild(document.createTextNode(' Mientras tanto se siguen mostrando los datos cargados anteriormente.'));
+        }
+      })
+      .then(terminarCarga);
+  }
+
+  function terminarCarga() {
+    el('mensajeCargando').hidden = true;
+    var boton = el('btnActualizar');
+    boton.disabled = false;
+    boton.textContent = 'Actualizar datos';
+  }
+
+  // ----- Filtros -----
+  function valoresUnicos(campo) {
+    var vistos = {};
+    TODOS.forEach(function (f) { vistos[f[campo]] = true; });
+    return Object.keys(vistos).sort(function (a, b) { return a.localeCompare(b, 'es'); });
+  }
+
+  function llenarSelect(select, valores, textoTodas) {
+    var elegido = select.value;
+    select.innerHTML = '';
+    var todas = document.createElement('option');
+    todas.value = '';
+    todas.textContent = textoTodas;
+    select.appendChild(todas);
+    valores.forEach(function (v) {
+      var op = document.createElement('option');
+      op.value = v;
+      op.textContent = v;
+      select.appendChild(op);
+    });
+    // Se mantiene la selección anterior si todavía existe
+    select.value = valores.indexOf(elegido) !== -1 ? elegido : '';
+  }
+
+  function prepararFiltros() {
+    llenarSelect(el('filtroSede'), valoresUnicos('sede'), 'Todas las sedes');
+    llenarSelect(el('filtroCarrera'), valoresUnicos('carrera'), 'Todas las carreras');
+  }
+
+  function filasFiltradas() {
+    var sede = el('filtroSede').value;
+    var carrera = el('filtroCarrera').value;
+    return TODOS.filter(function (f) {
+      return (!sede || f.sede === sede) && (!carrera || f.carrera === carrera);
+    });
+  }
+
+  function textoFiltros() {
+    var sede = el('filtroSede').value || 'Todas';
+    var carrera = el('filtroCarrera').value || 'Todas';
+    return 'Filtros aplicados – Sede: ' + sede + '. Carrera: ' + carrera + '.';
+  }
+
+  // ----- Dibujar todo -----
+  function renderizar() {
+    var filas = filasFiltradas();
+    var hayFiltro = el('filtroSede').value !== '' || el('filtroCarrera').value !== '';
+
+    el('cuentaFiltro').textContent = 'Mostrando ' + formatoNumero(filas.length) + ' de ' + formatoNumero(TODOS.length) + ' préstamos';
+    el('sinResultados').hidden = filas.length > 0;
+    el('vistaDatos').hidden = filas.length === 0;
+    if (filas.length === 0) { MODELOS = {}; return; }
+
+    // Tarjetas
+    var r = calcularResumen(filas);
+    el('kpiTotal').textContent = formatoNumero(r.total);
+    var rango = rangoFechas(filas);
+    var detalleTotal = rango ? 'del ' + fechaLegible(rango.desde) + ' al ' + fechaLegible(rango.hasta) : '';
+    if (hayFiltro) detalleTotal = (detalleTotal ? detalleTotal + '. ' : '') + 'Sin filtros: ' + formatoNumero(TODOS.length);
+    el('kpiTotalDetalle').textContent = detalleTotal;
+    el('kpiUsuarios').textContent = formatoNumero(r.usuarios);
+    el('kpiSede').textContent = r.sedeTop.nombre;
+    el('kpiSedeDetalle').textContent = formatoNumero(r.sedeTop.prestamos) + ' préstamos (' + formatoPorcentaje(r.sedeTop.prestamos / r.total) + ')';
+    el('kpiCarrera').textContent = r.carreraTop.nombre;
+    el('kpiCarreraDetalle').textContent = formatoNumero(r.carreraTop.prestamos) + ' préstamos (' + formatoPorcentaje(r.carreraTop.prestamos / r.total) + ')';
+
+    // Tablas, gráficos y botones de descarga
+    MODELOS = armarModelos(filas);
+    dibujarBarras('grSede', 'cajaSede', contarPor(filas, 'sede'));
+    dibujarBarras('grCarrera', 'cajaCarrera', contarPor(filas, 'carrera'));
+    var mes = contarPorMes(filas);
+    dibujarLinea('grMes', mes.meses);
+    var nota = el('notaMes');
+    nota.hidden = mes.sinFecha === 0;
+    nota.textContent = mes.sinFecha + ' préstamos sin una fecha válida no aparecen en este gráfico.';
+    llenarTablaTitulos(topTitulos(filas, 10));
+    document.querySelectorAll('.boton-descarga').forEach(function (b) { b.disabled = false; });
+  }
+
+  function llenarTablaTitulos(titulos) {
+    var cuerpo = el('cuerpoTitulos');
+    cuerpo.innerHTML = '';
+    titulos.forEach(function (t, i) {
+      var tr = document.createElement('tr');
+      [String(i + 1), t.nombre, t.autor, formatoNumero(t.prestamos)].forEach(function (texto, k) {
+        var td = document.createElement('td');
+        td.textContent = texto;
+        if (k === 0) td.className = 'rango';
+        if (k === 3) td.className = 'num';
+        tr.appendChild(td);
+      });
+      cuerpo.appendChild(tr);
+    });
+  }
+
+  // ----- Gráficos -----
+  // Escribe el número al final de cada barra
+  var etiquetasValores = {
+    id: 'etiquetasValores',
+    afterDatasetsDraw: function (grafico) {
+      var ctx = grafico.ctx;
+      ctx.save();
+      ctx.font = '600 12px ' + FUENTE;
+      ctx.fillStyle = CONFIG.COLOR_PRINCIPAL;
+      ctx.textBaseline = 'middle';
+      ctx.textAlign = 'left';
+      grafico.getDatasetMeta(0).data.forEach(function (barra, i) {
+        ctx.fillText(formatoNumero(grafico.data.datasets[0].data[i]), barra.x + 6, barra.y);
+      });
+      ctx.restore();
+    }
+  };
+
+  function configurarFuentes() {
+    Chart.defaults.font.family = FUENTE;
+    Chart.defaults.font.size = 12;
+    Chart.defaults.color = '#1B2433';
+  }
+
+  function dibujarBarras(idCanvas, idCaja, items) {
+    if (GRAFICOS[idCanvas]) GRAFICOS[idCanvas].destroy();
+    el(idCaja).style.height = Math.max(170, 50 + items.length * 30) + 'px';
+    GRAFICOS[idCanvas] = new Chart(el(idCanvas), {
+      type: 'bar',
+      data: {
+        labels: items.map(function (i) { return i.nombre; }),
+        datasets: [{
+          data: items.map(function (i) { return i.prestamos; }),
+          backgroundColor: CONFIG.COLOR_PRINCIPAL,
+          borderRadius: 3,
+          maxBarThickness: 22
+        }]
+      },
+      options: {
+        indexAxis: 'y',
+        responsive: true,
+        maintainAspectRatio: false,
+        animation: false,
+        layout: { padding: { right: 46 } },
+        plugins: {
+          legend: { display: false },
+          tooltip: { callbacks: { label: function (c) { return ' ' + formatoNumero(c.parsed.x) + ' préstamos'; } } }
+        },
+        scales: {
+          x: { beginAtZero: true, ticks: { precision: 0 }, grid: { color: '#E6EAF2' } },
+          y: {
+            grid: { display: false },
+            ticks: {
+              // Los nombres muy largos se acortan; el nombre completo se ve al pasar el cursor
+              callback: function (valor) {
+                var texto = this.getLabelForValue(valor);
+                return texto.length > 28 ? texto.slice(0, 27) + '…' : texto;
+              }
+            }
+          }
+        }
+      },
+      plugins: [etiquetasValores]
+    });
+  }
+
+  function dibujarLinea(idCanvas, meses) {
+    if (GRAFICOS[idCanvas]) GRAFICOS[idCanvas].destroy();
+    GRAFICOS[idCanvas] = new Chart(el(idCanvas), {
+      type: 'line',
+      data: {
+        labels: meses.map(function (m) { return m.nombre; }),
+        datasets: [{
+          data: meses.map(function (m) { return m.prestamos; }),
+          borderColor: CONFIG.COLOR_ACENTO,
+          backgroundColor: CONFIG.COLOR_ACENTO + '33',
+          pointBackgroundColor: CONFIG.COLOR_PRINCIPAL,
+          pointBorderColor: CONFIG.COLOR_PRINCIPAL,
+          pointRadius: 4,
+          borderWidth: 3,
+          tension: 0.25,
+          fill: true
+        }]
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        animation: false,
+        plugins: {
+          legend: { display: false },
+          tooltip: { callbacks: { label: function (c) { return ' ' + formatoNumero(c.parsed.y) + ' préstamos'; } } }
+        },
+        scales: {
+          x: { grid: { display: false } },
+          y: { beginAtZero: true, ticks: { precision: 0 }, grid: { color: '#E6EAF2' } }
+        }
+      }
+    });
+  }
+
+  // ----- Descargas -----
+  function aviso(texto, esError) {
+    var p = el('avisoDescarga');
+    p.textContent = texto;
+    p.className = esError ? 'con-error' : '';
+  }
+
+  function fechaParaArchivo() {
+    var h = new Date();
+    return h.getFullYear() + '-' + dosDigitos(h.getMonth() + 1) + '-' + dosDigitos(h.getDate());
+  }
+
+  function descargarBlob(blob, nombre) {
+    var enlace = document.createElement('a');
+    enlace.href = URL.createObjectURL(blob);
+    enlace.download = nombre;
+    document.body.appendChild(enlace);
+    enlace.click();
+    enlace.remove();
+    setTimeout(function () { URL.revokeObjectURL(enlace.href); }, 3000);
+  }
+
+  function exportar(clave, formato) {
+    var modelo = MODELOS[clave];
+    if (!modelo) return;
+    var contexto = {
+      titulo: el('titulo').textContent,
+      filtros: textoFiltros() + ' ' + formatoNumero(filasFiltradas().length) + ' préstamos considerados.',
+      cargado: textoCargado(),
+      imagen: null
+    };
+    var nombre = modelo.archivo + '_' + fechaParaArchivo() + '.' + formato;
+    aviso('Preparando ' + nombre + '…', false);
+
+    try {
+      if (formato === 'pdf') {
+        if (!window.jspdf) throw new Error('No se descargó la librería para crear PDF. Revisa tu conexión y recarga la página.');
+        if (modelo.grafico && GRAFICOS[modelo.grafico]) {
+          var g = GRAFICOS[modelo.grafico];
+          contexto.imagen = { url: g.toBase64Image('image/png', 1), ancho: g.canvas.width, alto: g.canvas.height };
+        }
+        construirPDF(modelo, contexto).save(nombre);
+        aviso('Listo: se descargó ' + nombre + '.', false);
+      } else {
+        if (!window.ExcelJS) throw new Error('No se descargó la librería para crear Excel. Revisa tu conexión y recarga la página.');
+        construirExcel(modelo, contexto).then(function (buffer) {
+          descargarBlob(new Blob([buffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' }), nombre);
+          aviso('Listo: se descargó ' + nombre + '.', false);
+        }).catch(function (e) {
+          aviso('No se pudo crear el archivo Excel: ' + e.message, true);
+        });
+      }
+    } catch (e) {
+      aviso('No se pudo crear el archivo: ' + e.message, true);
+    }
+  }
+
+  // ----- Conexión de botones y arranque -----
+  el('btnActualizar').addEventListener('click', cargarDatos);
+  el('filtroSede').addEventListener('change', renderizar);
+  el('filtroCarrera').addEventListener('change', renderizar);
+  el('btnLimpiar').addEventListener('click', function () {
+    el('filtroSede').value = '';
+    el('filtroCarrera').value = '';
+    renderizar();
+  });
+  document.querySelectorAll('.boton-descarga').forEach(function (b) {
+    b.disabled = true;
+    b.addEventListener('click', function () { exportar(b.getAttribute('data-cat'), b.getAttribute('data-fmt')); });
+  });
+
+  aplicarAjustes();
+  if (typeof Chart !== 'undefined') configurarFuentes();
+  cargarDatos();   // se leen los datos cada vez que se abre la página
+  </script>
+</body>
+</html>
